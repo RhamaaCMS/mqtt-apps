@@ -1,0 +1,456 @@
+{% extends "wagtailadmin/base.html" %}
+{% load static %}
+
+{% block titletag %}MQTT Dashboard{% endblock %}
+
+{% block extra_css %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'mqtt/css/mqtt-admin.css' %}">
+    <style>
+        .mqtt-dashboard {
+            padding: 20px;
+        }
+        .mqtt-status {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .mqtt-status.connected {
+            background: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .mqtt-status.disconnected {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .mqtt-controls {
+            margin-bottom: 20px;
+        }
+        .mqtt-controls button {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        .mqtt-topics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .mqtt-topic-card {
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            background: white;
+        }
+        .mqtt-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            background: white;
+        }
+        .mqtt-message {
+            border-bottom: 1px solid #eee;
+            padding: 10px 0;
+        }
+        .mqtt-message:last-child {
+            border-bottom: none;
+        }
+        .message-topic {
+            font-weight: bold;
+            color: #007cba;
+        }
+        .message-time {
+            font-size: 0.8em;
+            color: #666;
+        }
+        .message-payload {
+            margin-top: 5px;
+            font-family: monospace;
+            background: #f8f9fa;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group textarea, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-primary {
+            background: #007cba;
+            color: white;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .alert {
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+        }
+        .alert-success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .alert-danger {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+    </style>
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+    <script src="{% static 'mqtt/js/mqtt-admin.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+    <div class="mqtt-dashboard">
+        <!-- Alert Messages -->
+        <div id="mqtt-alerts"></div>
+        <div id="mqtt-loader" style="display:none; padding: 10px; background: #f0f0f0; text-align: center;">Loading...</div>
+        <h1>MQTT Dashboard</h1>
+        
+        <!-- Connection Status -->
+        <div class="mqtt-status {% if is_connected %}connected{% else %}disconnected{% endif %}" id="connection-status">
+            <h3>Connection Status</h3>
+            <p><strong>Status:</strong> <span id="status-text">{% if is_connected %}Connected{% else %}Disconnected{% endif %}</span></p>
+            {% if connection %}
+                <p><strong>Broker:</strong> {{ connection.broker_host }}:{{ connection.broker_port }}</p>
+                {% if connection.last_connected %}
+                    <p><strong>Last Connected:</strong> {{ connection.last_connected }}</p>
+                {% endif %}
+                {% if connection.last_error %}
+                    <p><strong>Last Error:</strong> {{ connection.last_error }}</p>
+                {% endif %}
+            {% endif %}
+        </div>
+        
+        <!-- Controls -->
+        <div class="mqtt-controls">
+            <button class="btn btn-success" onclick="connectMqtt()" id="connect-btn" {% if is_connected %}style="display:none"{% endif %}>Connect</button>
+            <button class="btn btn-danger" onclick="disconnectMqtt()" id="disconnect-btn" {% if not is_connected %}style="display:none"{% endif %}>Disconnect</button>
+            <button class="btn btn-primary" onclick="showPublishForm()">Publish Message</button>
+            <button class="btn btn-secondary" onclick="showSubscribeForm()">Subscribe to Topic</button>
+            <button class="btn btn-secondary" onclick="refreshStatus()">Refresh Status</button>
+        </div>
+        
+        <!-- Alert Messages -->
+        <div id="alert-container"></div>
+        
+        <!-- Publish Form (Hidden by default) -->
+        <div id="publish-form" style="display:none; background: white; border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
+            <h3>Publish Message</h3>
+            <div class="form-group">
+                <label for="publish-topic">Topic:</label>
+                <input type="text" id="publish-topic" placeholder="e.g., sensor/temperature">
+            </div>
+            <div class="form-group">
+                <label for="publish-payload">Payload:</label>
+                <textarea id="publish-payload" rows="4" placeholder="Message content"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="publish-qos">QoS:</label>
+                <select id="publish-qos">
+                    <option value="0">0 - At most once</option>
+                    <option value="1" selected>1 - At least once</option>
+                    <option value="2">2 - Exactly once</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="publish-retain"> Retain message
+                </label>
+            </div>
+            <button class="btn btn-primary" onclick="publishMessage()">Publish</button>
+            <button class="btn btn-secondary" onclick="hidePublishForm()">Cancel</button>
+        </div>
+        
+        <!-- Subscribe Form (Hidden by default) -->
+        <div id="subscribe-form" style="display:none; background: white; border: 1px solid #ddd; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
+            <h3>Subscribe to Topic</h3>
+            <div class="form-group">
+                <label for="subscribe-topic">Topic:</label>
+                <input type="text" id="subscribe-topic" placeholder="e.g., sensor/+">
+            </div>
+            <div class="form-group">
+                <label for="subscribe-description">Description:</label>
+                <input type="text" id="subscribe-description" placeholder="Optional description">
+            </div>
+            <div class="form-group">
+                <label for="subscribe-qos">QoS:</label>
+                <select id="subscribe-qos">
+                    <option value="0">0 - At most once</option>
+                    <option value="1" selected>1 - At least once</option>
+                    <option value="2">2 - Exactly once</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="subscribeTopic()">Subscribe</button>
+            <button class="btn btn-secondary" onclick="hideSubscribeForm()">Cancel</button>
+        </div>
+        
+        <!-- Topics and Messages -->
+        <div class="mqtt-topics">
+            <div>
+                <h3>Active Topics ({{ topics.count }})</h3>
+                <div class="mqtt-topic-card">
+                    {% for topic in topics %}
+                        <div style="border-bottom: 1px solid #eee; padding: 10px 0;">
+                            <strong>{{ topic.name }}</strong>
+                            {% if topic.description %}
+                                <br><small>{{ topic.description }}</small>
+                            {% endif %}
+                            <br><small>Messages: {{ topic.message_count }} | QoS: {{ topic.qos }}</small>
+                            {% if topic.latest_message %}
+                                <br><small>Latest: {{ topic.latest_message.received_at }}</small>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <p>No active topics</p>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div>
+                <h3>Recent Messages</h3>
+                <div class="mqtt-messages" id="recent-messages">
+                    {% for message in recent_messages %}
+                        <div class="mqtt-message">
+                            <div class="message-topic">{{ message.topic.name }}</div>
+                            <div class="message-time">{{ message.received_at }}</div>
+                            <div class="message-payload">{{ message.payload_preview }}</div>
+                        </div>
+                    {% empty %}
+                        <p>No messages received yet</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // MQTT Dashboard JavaScript
+        function showAlert(message, type = 'success') {
+            const alertContainer = document.getElementById('alert-container');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type}`;
+            alertDiv.textContent = message;
+            alertContainer.appendChild(alertDiv);
+            
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+        
+        function connectMqtt() {
+            fetch('/mqtt/connect/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    updateConnectionStatus(true);
+                } else {
+                    showAlert(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Error connecting to MQTT broker', 'danger');
+            });
+        }
+        
+        function disconnectMqtt() {
+            fetch('/mqtt/disconnect/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    updateConnectionStatus(false);
+                } else {
+                    showAlert(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Error disconnecting from MQTT broker', 'danger');
+            });
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusDiv = document.getElementById('connection-status');
+            const statusText = document.getElementById('status-text');
+            const connectBtn = document.getElementById('connect-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            
+            if (connected) {
+                statusDiv.className = 'mqtt-status connected';
+                statusText.textContent = 'Connected';
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'inline-block';
+            } else {
+                statusDiv.className = 'mqtt-status disconnected';
+                statusText.textContent = 'Disconnected';
+                connectBtn.style.display = 'inline-block';
+                disconnectBtn.style.display = 'none';
+            }
+        }
+        
+        function showPublishForm() {
+            document.getElementById('publish-form').style.display = 'block';
+            document.getElementById('subscribe-form').style.display = 'none';
+        }
+        
+        function hidePublishForm() {
+            document.getElementById('publish-form').style.display = 'none';
+        }
+        
+        function showSubscribeForm() {
+            document.getElementById('subscribe-form').style.display = 'block';
+            document.getElementById('publish-form').style.display = 'none';
+        }
+        
+        function hideSubscribeForm() {
+            document.getElementById('subscribe-form').style.display = 'none';
+        }
+        
+        function publishMessage() {
+            const topic = document.getElementById('publish-topic').value;
+            const payload = document.getElementById('publish-payload').value;
+            const qos = parseInt(document.getElementById('publish-qos').value);
+            const retain = document.getElementById('publish-retain').checked;
+            
+            if (!topic || !payload) {
+                showAlert('Topic and payload are required', 'danger');
+                return;
+            }
+            
+            fetch('/mqtt/publish/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    topic: topic,
+                    payload: payload,
+                    qos: qos,
+                    retain: retain
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    hidePublishForm();
+                    // Clear form
+                    document.getElementById('publish-topic').value = '';
+                    document.getElementById('publish-payload').value = '';
+                } else {
+                    showAlert(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Error publishing message', 'danger');
+            });
+        }
+        
+        function subscribeTopic() {
+            const topic = document.getElementById('subscribe-topic').value;
+            const description = document.getElementById('subscribe-description').value;
+            const qos = parseInt(document.getElementById('subscribe-qos').value);
+            
+            if (!topic) {
+                showAlert('Topic is required', 'danger');
+                return;
+            }
+            
+            fetch('/mqtt/subscribe/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    topic: topic,
+                    description: description,
+                    qos: qos
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(data.message, 'success');
+                    hideSubscribeForm();
+                    // Clear form
+                    document.getElementById('subscribe-topic').value = '';
+                    document.getElementById('subscribe-description').value = '';
+                    // Refresh page to show new topic
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(data.message, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Error subscribing to topic', 'danger');
+            });
+        }
+        
+        function refreshStatus() {
+            fetch('/mqtt/status/')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateConnectionStatus(data.is_connected);
+                    showAlert('Status refreshed', 'success');
+                } else {
+                    showAlert('Error refreshing status', 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('Error refreshing status', 'danger');
+            });
+        }
+        
+        // Auto-refresh status every 30 seconds
+        setInterval(refreshStatus, 30000);
+    </script>
+    </div>
+{% endblock %}

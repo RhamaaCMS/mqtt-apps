@@ -1,0 +1,242 @@
+/* MQTT Admin Dashboard Styles */
+
+.mqtt-status-panel {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+.mqtt-status-panel .status-success {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.mqtt-status-panel .status-error {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.mqtt-dashboard-widget {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.mqtt-connection-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.mqtt-status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.mqtt-status-indicator.connected {
+    background-color: #28a745;
+    box-shadow: 0 0 5px rgba(40, 167, 69, 0.5);
+}
+
+.mqtt-status-indicator.disconnected {
+    background-color: #dc3545;
+    box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
+}
+
+.mqtt-status-indicator.connecting {
+    background-color: #ffc107;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.mqtt-quick-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.mqtt-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.mqtt-stat-card {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    text-align: center;
+    border: 1px solid #dee2e6;
+}
+
+.mqtt-stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: #007cba;
+    display: block;
+}
+
+.mqtt-stat-label {
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.mqtt-topic-list {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.mqtt-topic-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mqtt-topic-item:last-child {
+    border-bottom: none;
+}
+
+.mqtt-topic-item:hover {
+    background-color: #f8f9fa;
+}
+
+.mqtt-topic-name {
+    font-weight: bold;
+    color: #007cba;
+}
+
+.mqtt-topic-meta {
+    font-size: 0.8em;
+    color: #666;
+}
+
+.mqtt-message-preview {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+    background: #f8f9fa;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.mqtt-form-inline {
+    display: flex;
+    gap: 10px;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.mqtt-form-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.mqtt-form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.mqtt-form-group input,
+.mqtt-form-group select,
+.mqtt-form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.mqtt-alert {
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+.mqtt-alert-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.mqtt-alert-error {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.mqtt-alert-warning {
+    color: #856404;
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+}
+
+.mqtt-alert-info {
+    color: #0c5460;
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .mqtt-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .mqtt-quick-actions {
+        flex-direction: column;
+    }
+    
+    .mqtt-form-inline {
+        flex-direction: column;
+    }
+    
+    .mqtt-form-group {
+        min-width: auto;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .mqtt-dashboard-widget {
+        background: #2d3748;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    
+    .mqtt-stat-card {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    .mqtt-topic-item:hover {
+        background-color: #4a5568;
+    }
+    
+    .mqtt-message-preview {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+}
